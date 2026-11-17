@@ -10,6 +10,7 @@ const ICON = {
   custom: '<path d="M10.8 2.6l2.6 2.6-7.6 7.6-3.2.6.6-3.2z"/>',
   globe: '<circle cx="8" cy="8" r="6.2"/><path d="M1.8 8h12.4M8 1.8c2.2 2.4 2.2 10 0 12.4M8 1.8c-2.2 2.4-2.2 10 0 12.4"/>',
   restart: '<path d="M13.2 8.4A5.2 5.2 0 1 1 11.6 4.3M13.4 2.4v2.9h-2.9"/>',
+  next: '<path d="M2.8 8h9.6M8.6 4.2 12.4 8l-3.8 3.8"/>',
 };
 const icon = (name) => `<svg viewBox="0 0 16 16" aria-hidden="true">${ICON[name]}</svg>`;
 
@@ -379,7 +380,12 @@ document.addEventListener('keydown', (e) => {
   const popup = document.querySelector('.overlay:not([hidden])');
   if (popup) { if (e.key === 'Escape') popup.hidden = true; return; }
   if (e.key === 'Escape') { e.preventDefault(); return newTest(true); }
-  if (e.key === 'Tab') { e.preventDefault(); return newTest(false); }
+  // Tab focuses the next-test button, Enter (native button click) then switches, like Monkeytype.
+  if (e.key === 'Tab') { e.preventDefault(); return $(test.end ? '#next' : '#skip').focus(); }
+  if (e.target.tagName === 'BUTTON') {
+    if (e.key === 'Enter' || e.key === ' ') return;
+    e.target.blur(); // any other key goes back to typing
+  }
   if (['SELECT', 'INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
   if (e.metaKey || e.ctrlKey !== e.altKey) return; // ignore shortcuts, allow AltGr (ctrl+alt) chars
   if (test.end) { if (e.key === 'Enter') { e.preventDefault(); newTest(false); } return; }
@@ -400,6 +406,8 @@ document.addEventListener('keydown', (e) => {
 $('#next').onclick = () => newTest(false);
 $('#restart').innerHTML = icon('restart');
 $('#restart').onclick = (e) => { e.currentTarget.blur(); newTest(true); };
+$('#skip').innerHTML = icon('next');
+$('#skip').onclick = (e) => { e.currentTarget.blur(); newTest(false); };
 $('#langBtn').onclick = (e) => { e.currentTarget.blur(); openLangs(); };
 
 const themeSel = $('#theme');

@@ -33,7 +33,10 @@
         <span id="algoName"></span>
       </div>
       <pre id="code"></pre>
-      <button id="restart" class="ghost" aria-label="restart test"></button>
+      <div id="testBtns">
+        <button id="restart" class="ghost" aria-label="restart test" title="restart (esc)"></button>
+        <button id="skip" class="ghost" aria-label="next test" title="next test (tab, enter)"></button>
+      </div>
     </div>
 
     <section id="result" hidden>
@@ -57,7 +60,7 @@
   </main>
 
   <footer>
-    <div><kbd>tab</kbd> new test &nbsp; <kbd>esc</kbd> restart &nbsp; indentation is typed for you</div>
+    <div><kbd>tab</kbd> + <kbd>enter</kbd> next test &nbsp; <kbd>esc</kbd> restart &nbsp; indentation is typed for you</div>
     <label class="theme">theme <select id="theme"></select></label>
   </footer>
 
