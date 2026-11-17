@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>penguintype</title>
+  <meta name="theme-color" content="#15181e">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="logo">penguin<span>type</span></div>
+    <div class="top-right" id="account" hidden>
+      <button id="boardBtn" class="pill">leaderboard</button>
+      <button id="signInBtn" class="pill">sign in</button>
+      <button id="userBtn" class="pill" hidden></button>
+    </div>
+  </header>
+
+  <nav id="bar">
+    <div class="group" id="contents"></div>
+    <div class="group" id="modes"></div>
+    <div class="group" id="sub"></div>
+  </nav>
+
+  <main>
+    <div id="test">
+      <div id="live">
+        <span id="liveWpm"></span>
+        <button id="langBtn" class="ghost"></button>
+        <span id="algoName"></span>
+      </div>
+      <pre id="code"></pre>
+      <button id="restart" class="ghost" aria-label="restart test"></button>
+    </div>
+
+    <section id="result" hidden>
+      <div class="big"><div class="label">wpm</div><div id="rWpm"></div></div>
+      <div class="big"><div class="label">acc</div><div id="rAcc"></div></div>
+      <div id="rPb"></div>
+      <div id="lb" hidden><span id="lbMsg"></span><button id="lbSignIn" class="pill" hidden>sign in</button></div>
+      <div class="chart">
+        <svg id="graph" role="img" aria-label="speed over time"></svg>
+        <div id="tip" hidden></div>
+        <div class="legend"><span class="k-wpm">wpm</span><span class="k-raw">raw</span><span class="k-err">errors (right axis)</span></div>
+      </div>
+      <div class="small">
+        <div><div class="label">raw</div><div id="rRaw"></div></div>
+        <div><div class="label">characters</div><div id="rChars"></div></div>
+        <div><div class="label">time</div><div id="rTime"></div></div>
+        <div><div class="label">test</div><div id="rAlgo"></div></div>
+      </div>
+      <button id="next" class="pill">next test</button>
+    </section>
+  </main>
+
+  <footer>
+    <div><kbd>tab</kbd> new test &nbsp; <kbd>esc</kbd> restart &nbsp; indentation is typed for you</div>
+    <label class="theme">theme <select id="theme"></select></label>
+  </footer>
+
+  <!-- popups: all use .overlay; Esc or a click outside closes them -->
+  <div id="langPop" class="overlay" hidden>
+    <div class="panel narrow" role="dialog" aria-label="language">
+      <div class="panel-head"><h2>language</h2><button class="close" data-close aria-label="close">✕</button></div>
+      <div id="langList" class="list"></div>
+    </div>
+  </div>
+
+  <div id="customPop" class="overlay" hidden>
+    <div class="panel" role="dialog" aria-label="custom text">
+      <div class="panel-head"><h2>custom code</h2><button class="close" data-close aria-label="close">✕</button></div>
+      <textarea id="customText" spellcheck="false" placeholder="paste any code you want to practise"></textarea>
+      <button id="customSave" class="pill">use this code</button>
+    </div>
+  </div>
+
+  <div id="board" class="overlay" hidden>
+    <div class="panel" role="dialog" aria-label="leaderboard">
+      <div class="panel-head"><h2>leaderboard <span>60s · all</span></h2><button class="close" data-close aria-label="close">✕</button></div>
+      <div class="group tabs" id="boardLangs"></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>name</th><th>wpm</th><th>acc</th><th>raw</th><th>date</th></tr></thead>
+          <tbody id="boardRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="auth" class="overlay" hidden>
+    <form class="panel narrow" id="authForm" role="dialog" aria-label="account">
+      <div class="panel-head"><h2 id="authTitle">sign in</h2><button type="button" class="close" data-close aria-label="close">✕</button></div>
+      <div class="group tabs">
+        <button type="button" data-tab="login">sign in</button>
+        <button type="button" data-tab="signup">create account</button>
+      </div>
+      <label>username <input id="authUser" autocomplete="username" maxlength="20" required></label>
+      <label>password <input id="authPass" type="password" autocomplete="current-password" maxlength="200" required></label>
+      <div id="authHint" class="hint"></div>
+      <div id="authErr" class="err"></div>
+      <button id="authSubmit" class="pill">sign in</button>
+    </form>
+  </div>
+
+  <div id="profile" class="overlay" hidden>
+    <div class="panel" role="dialog" aria-label="profile">
+      <div class="panel-head"><h2 id="profName"></h2><button class="close" data-close aria-label="close">✕</button></div>
+      <div id="profTotals" class="hint"></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>language</th><th>60s best</th><th>best</th><th>average</th><th>tests</th></tr></thead>
+          <tbody id="profLangs"></tbody>
+        </table>
+        <h3>recent tests</h3>
+        <table>
+          <thead><tr><th>date</th><th>test</th><th>language</th><th>wpm</th><th>acc</th></tr></thead>
+          <tbody id="profRecent"></tbody>
+        </table>
+      </div>
+      <button id="signOut" class="pill">sign out</button>
+    </div>
+  </div>
+
+  <script src="engine.js"></script>
+  <script src="snippets.js"></script>
+  <script src="snippets-more.js"></script>
+  <script src="app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
+  <script src="account.js"></script>
+</body>
+</html>
