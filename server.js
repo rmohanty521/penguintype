@@ -19,7 +19,7 @@ const SESSION_DAYS = 30;
 const PUBLIC = {
   'index.html': 'text/html', 'style.css': 'text/css', 'app.js': 'text/javascript', 'account.js': 'text/javascript',
   'engine.js': 'text/javascript', 'snippets.js': 'text/javascript', 'snippets-more.js': 'text/javascript',
-  'generators.js': 'text/javascript', 'projects.js': 'text/javascript',
+  'generators.js': 'text/javascript', 'projects.js': 'text/javascript', 'favicon.svg': 'image/svg+xml',
 };
 
 const db = new DatabaseSync(process.env.DB_PATH || path.join(ROOT, 'scores.db'));
