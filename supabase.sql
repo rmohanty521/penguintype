@@ -85,3 +85,38 @@ language sql stable set search_path = '' as $$
               where user_id = auth.uid() order by snippet, lang, wpm desc) t)
   )
 $$;
+
+-- ===== update 2026-11-17: daily challenge + build mode =====
+-- If you already ran everything above, run only from here down.
+alter table public.runs drop constraint runs_mode_check;
+alter table public.runs add constraint runs_mode_check
+  check (mode in ('time', 'snippet', 'pick', 'zen', 'custom', 'daily', 'build'));
+-- A daily run only counts on its own (UTC) day.
+-- ponytail: a test started just before midnight UTC and finished after it gets rejected.
+alter table public.runs add constraint runs_daily_today
+  check (mode <> 'daily' or snippet = 'daily-' || to_char(created at time zone 'utc', 'YYYY-MM-DD'));
+
+drop function public.leaderboard(text);
+drop function public.board_rank(text);
+
+-- Best qualifying run per user for one board: 'time60-all' or 'daily-YYYY-MM-DD'.
+create function public.leaderboard(p_lang text, p_snippet text default 'time60-all')
+returns table (name text, wpm real, raw real, acc real, created timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select * from (
+    select distinct on (r.user_id) p.username, r.wpm, r.raw, r.acc, r.created
+    from public.runs r join public.profiles p on p.id = r.user_id
+    where r.lang = p_lang and r.snippet = p_snippet and r.acc >= 75
+    order by r.user_id, r.wpm desc
+  ) b order by wpm desc limit 50
+$$;
+
+create function public.board_rank(p_lang text, p_snippet text default 'time60-all')
+returns table (rank bigint, best real)
+language sql stable security definer set search_path = '' as $$
+  with bests as (
+    select user_id, max(wpm) as w from public.runs
+    where lang = p_lang and snippet = p_snippet and acc >= 75 group by user_id
+  )
+  select (select count(*) + 1 from bests where w > me.w), me.w from bests me where me.user_id = auth.uid()
+$$;

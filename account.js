@@ -67,7 +67,7 @@ async function syncPbs() {
   } catch {}
 }
 
-const isBoardRun = (s) => cfg.mode === 'time' && cfg.time === 60 && cfg.content === 'all' && s.seconds >= 59.5;
+const isBoardRun = (s) => cfg.mode === 'daily' || (cfg.mode === 'time' && cfg.time === 60 && cfg.content === 'all' && s.seconds >= 59.5);
 
 async function onRunFinished(s) {
   const lb = $('#lb');
@@ -76,7 +76,7 @@ async function onRunFinished(s) {
   pendingRun = null;
   if (!serverOk || !test.start) return;
 
-  const run = { lang: cfg.lang, mode: cfg.mode, snippet: snip.id, wpm: s.wpm, raw: s.raw, acc: s.acc, seconds: s.seconds };
+  const run = { lang: lang(), mode: cfg.mode, snippet: snip.id, wpm: s.wpm, raw: s.raw, acc: s.acc, seconds: s.seconds };
   if (!me) {
     pendingRun = run;
     lb.hidden = false;
@@ -95,9 +95,10 @@ async function saveRun(run, boardRun) {
   $('#lbMsg').textContent = 'saving...';
   try {
     ok(await sb.from('runs').insert(run));
-    const r = boardRun && run.acc >= 75 ? ok(await sb.rpc('board_rank', { p_lang: run.lang }))[0] || {} : {};
+    const r = boardRun && run.acc >= 75 ? ok(await sb.rpc('board_rank', { p_lang: run.lang, p_snippet: run.snippet }))[0] || {} : {};
+    const board = run.mode === 'daily' ? 'daily' : 'leaderboard';
     $('#lbMsg').textContent = r.rank
-      ? `saved · leaderboard rank #${r.rank} in ${LANGS[run.lang]} (best ${Math.round(r.best)})`
+      ? `saved · ${board} rank #${r.rank} in ${LANGS[run.lang]} (best ${Math.round(r.best)})`
       : boardRun ? 'saved · the leaderboard needs at least 75% accuracy' : 'saved to your profile';
   } catch (e) {
     $('#lbMsg').textContent = `not saved: ${e.message}`;
@@ -151,7 +152,7 @@ $('#authForm').onsubmit = async (e) => {
     // save the run they just finished, if its results are still on screen
     if (pendingRun && !$('#result').hidden) {
       $('#lbSignIn').hidden = true;
-      saveRun(pendingRun, pendingRun.snippet === 'time60-all');
+      saveRun(pendingRun, pendingRun.snippet === 'time60-all' || pendingRun.mode === 'daily');
     }
     pendingRun = null;
   } catch (err) {
@@ -191,14 +192,21 @@ $('#signOut').onclick = async () => {
 
 // --- leaderboard ---
 let boardLang = cfg.lang;
+let boardKind = 'time60-all'; // or 'daily'
 
 function openBoard() {
   boardLang = cfg.lang;
+  boardKind = cfg.mode === 'daily' ? 'daily' : 'time60-all';
   $('#board').hidden = false;
   loadBoard();
 }
 
 async function loadBoard() {
+  const kinds = $('#boardKinds');
+  kinds.textContent = '';
+  kinds.append(button('60s', boardKind === 'time60-all', () => { boardKind = 'time60-all'; loadBoard(); }));
+  kinds.append(button(`daily ${today()}`, boardKind === 'daily', () => { boardKind = 'daily'; loadBoard(); }));
+  $('#boardSub').textContent = boardKind === 'daily' ? "today's test" : '60s · all';
   const tabs = $('#boardLangs');
   tabs.textContent = '';
   for (const [value, label] of Object.entries(LANGS)) {
@@ -206,11 +214,13 @@ async function loadBoard() {
   }
   fillRows($('#boardRows'), [], 'loading...', 6);
   try {
-    const data = ok(await sb.rpc('leaderboard', { p_lang: boardLang }));
+    const snippet = boardKind === 'daily' ? `daily-${today()}` : boardKind;
+    const data = ok(await sb.rpc('leaderboard', { p_lang: boardLang, p_snippet: snippet }));
     fillRows($('#boardRows'), data.map((r, i) => ({
       me: me && r.name.toLowerCase() === me.username.toLowerCase(),
       cells: [i + 1, r.name, Math.round(r.wpm), `${Math.round(r.acc)}%`, Math.round(r.raw), fmtDate(r.created)],
-    })), 'no scores yet. finish a 60s test with "all" content to be first', 6);
+    })), boardKind === 'daily' ? 'no scores today yet. play the daily to be first'
+      : 'no scores yet. finish a 60s test with "all" content to be first', 6);
   } catch {
     fillRows($('#boardRows'), [], 'could not load the leaderboard', 6);
   }

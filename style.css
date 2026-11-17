@@ -296,3 +296,11 @@ kbd { background: var(--sub-bg); color: var(--text); border-radius: 4px; padding
   #live { grid-template-columns: auto 1fr; }
   #algoName { grid-column: 1 / -1; text-align: left; }
 }
+
+/* daily + build modes */
+#bar .note { color: var(--sub); padding: 6px 10px; font-size: 0.85rem; align-self: center; }
+#bar #sub { gap: 6px; align-items: center; }
+#buildDone { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; color: var(--main); font-size: 0.95rem; }
+#buildPlay { display: inline-flex; align-items: center; gap: 8px; }
+.panel.play { max-width: 460px; }
+#playFrame { width: 100%; aspect-ratio: 1; border: 0; border-radius: 8px; background: var(--sub-bg); }

@@ -1,4 +1,5 @@
-// UI: mode bar, rendering and key handling. Engine in engine.js, snippets in snippets*.js, accounts in account.js.
+// UI: mode bar, rendering and key handling. Engine in engine.js, snippets in snippets*.js, generated code in
+// generators.js, build-mode games in projects.js, accounts in account.js.
 const $ = (s) => document.querySelector(s);
 
 // Small line icons (stroke = currentColor), drawn for this site.
@@ -9,18 +10,21 @@ const ICON = {
   zen: '<path d="M2 10.5c2-2.6 4-2.6 6 0s4 2.6 6 0M4 6.5c1.4-1.6 2.8-1.6 4 0s2.6 1.6 4 0"/>',
   custom: '<path d="M10.8 2.6l2.6 2.6-7.6 7.6-3.2.6.6-3.2z"/>',
   globe: '<circle cx="8" cy="8" r="6.2"/><path d="M1.8 8h12.4M8 1.8c2.2 2.4 2.2 10 0 12.4M8 1.8c-2.2 2.4-2.2 10 0 12.4"/>',
+  daily: '<rect x="2.2" y="3.2" width="11.6" height="10.6" rx="1.5"/><path d="M2.2 6.6h11.6M5.4 1.8v2.6M10.6 1.8v2.6"/>',
+  build: '<path d="M2.5 13.5l6-6M7.2 3.6l2.2-2.2 5.2 5.2-2.2 2.2zM9.4 5.8L6.8 8.4"/>',
+  play: '<path d="M5 3l8 5-8 5z"/>',
   restart: '<path d="M13.2 8.4A5.2 5.2 0 1 1 11.6 4.3M13.4 2.4v2.9h-2.9"/>',
   next: '<path d="M2.8 8h9.6M8.6 4.2 12.4 8l-3.8 3.8"/>',
 };
 const icon = (name) => `<svg viewBox="0 0 16 16" aria-hidden="true">${ICON[name]}</svg>`;
 
-const MODES = ['time', 'snippet', 'pick', 'zen', 'custom'];
+const MODES = ['time', 'snippet', 'pick', 'daily', 'build', 'zen', 'custom'];
 const TIMES = [15, 30, 60, 120];
-const CONTENTS = ['all', 'algorithms', 'everyday'];
+const CONTENTS = ['all', 'algorithms', 'everyday', 'generated'];
 const CHARS_PER_SECOND = 50; // timed tests get more text than anyone can type (~600 wpm)
 const CUSTOM_MAX = 20000;
 
-const cfg = { lang: 'python', mode: 'snippet', time: 60, content: 'all', algo: ALGOS[0].id, custom: '' };
+const cfg = { lang: 'python', mode: 'snippet', time: 60, content: 'all', algo: ALGOS[0].id, custom: '', project: PROJECTS[0].id };
 try { Object.assign(cfg, JSON.parse(localStorage.getItem('penguintype') || '{}')); } catch {}
 // settings saved by older versions: mode was random/algorithms/pick plus a separate length
 if (cfg.mode === 'random' || cfg.mode === 'algorithms') {
@@ -33,6 +37,7 @@ if (!LANGS[cfg.lang]) cfg.lang = 'python';
 if (!MODES.includes(cfg.mode)) cfg.mode = 'snippet';
 if (!TIMES.includes(cfg.time)) cfg.time = 60;
 if (!CONTENTS.includes(cfg.content)) cfg.content = 'all';
+if (!PROJECTS.some((p) => p.id === cfg.project)) cfg.project = PROJECTS[0].id;
 const save = () => { try { localStorage.setItem('penguintype', JSON.stringify(cfg)); } catch {} };
 
 // Themes: [background, panel, muted text, text, accent, error]. Add one here and it shows in the picker.
@@ -73,21 +78,78 @@ function applyTheme(name) {
 applyTheme(cfg.theme);
 
 let test, snip, spans, ticker; // snip = { id, name, code } for the current language
+// Build-mode games are JavaScript (they run in the browser), whatever language is picked.
+const lang = () => (cfg.mode === 'build' ? 'javascript' : cfg.lang);
 
 // Personal bests per test + language. Kept in this browser; account.js merges in the account's bests.
 let pbs = {};
 try { pbs = JSON.parse(localStorage.getItem('penguintype-pbs') || '{}'); } catch {}
-const pbKey = () => `${snip.id}:${cfg.lang}`;
+const pbKey = () => `${snip.id}:${lang()}`;
 const savePbs = () => { try { localStorage.setItem('penguintype-pbs', JSON.stringify(pbs)); } catch {} };
 
 function algoSnips() {
-  return ALGOS.filter((a) => a.code[cfg.lang]).map((a) => ({ id: a.id, name: a.name, code: a.code[cfg.lang] }));
+  return ALGOS.filter((a) => a.code[lang()]).map((a) => ({ id: a.id, name: a.name, code: a.code[lang()] }));
+}
+
+// Fresh code from every template for this language (rand: Math.random, or seeded for the daily).
+function genSnips(rand = Math.random) {
+  return (GENERATORS[lang()] || []).map((g) => ({ id: g.id, name: g.name, code: g.make(rand) }));
 }
 
 function pool() {
   if (cfg.content === 'algorithms') return algoSnips();
-  if (cfg.content === 'everyday') return MISC[cfg.lang] || algoSnips();
-  return [...algoSnips(), ...(MISC[cfg.lang] || [])];
+  if (cfg.content === 'everyday') return MISC[lang()] || algoSnips();
+  if (cfg.content === 'generated') return genSnips();
+  return [...algoSnips(), ...(MISC[lang()] || []), ...genSnips()];
+}
+
+// --- daily challenge: the same test for everyone today (UTC), per language ---
+const today = () => new Date().toISOString().slice(0, 10);
+
+function seeded(str) { // mulberry32 seeded from a string hash
+  let h = 1779033703;
+  for (const c of str) h = Math.imul(h ^ c.charCodeAt(0), 3432918353);
+  return () => {
+    h = (h + 0x6d2b79f5) | 0;
+    let t = Math.imul(h ^ (h >>> 15), 1 | h);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function dailySnip() {
+  const rand = seeded(`${today()}:${lang()}`);
+  const all = [...algoSnips(), ...(MISC[lang()] || []), ...genSnips(rand)];
+  const s = all[Math.floor(rand() * all.length)];
+  return { id: `daily-${today()}`, name: `daily · ${s.name}`, code: s.code };
+}
+
+// --- build mode: type a game part by part; done[project] = parts finished ---
+let built = {};
+try { built = JSON.parse(localStorage.getItem('penguintype-build') || '{}'); } catch {}
+const project = () => PROJECTS.find((p) => p.id === cfg.project);
+const doneParts = () => Math.min(built[cfg.project] || 0, project().parts.length);
+// The part being typed: the first unfinished one, or the one picked in the bar.
+let buildPart = null;
+const partIndex = () => Math.min(buildPart ?? doneParts(), project().parts.length - 1);
+
+function buildSnip() {
+  const p = project(), i = partIndex();
+  return { id: `build-${p.id}-${i + 1}`, name: `${p.name} ${i + 1}/${p.parts.length} · ${p.parts[i].name}`, code: p.parts[i].code };
+}
+
+// Run parts 1..n of the current project in a sandboxed frame, coloured with the current theme.
+function playGame(n = doneParts()) {
+  const p = project();
+  const [bg, panel, sub, text, main, error] = ALL_THEMES[cfg.theme];
+  const theme = JSON.stringify({ bg, panel, sub, text, main, error });
+  const code = p.parts.slice(0, n).map((x) => x.code).join('\n\n').replace(/<\/script/gi, '<\\/script');
+  const frame = $('#playFrame');
+  frame.srcdoc = `<!doctype html><style>html,body{margin:0;height:100%;overflow:hidden;display:grid;place-items:center;background:${bg}}</style>`
+    + `<canvas id="game" width="400" height="400"></canvas><script>const THEME = ${theme};<\/script><script>${code}<\/script>`;
+  $('#playTitle').textContent = `${p.name} · ${n}/${p.parts.length} parts`;
+  $('#playPop').hidden = false;
+  frame.onload = () => frame.focus();
 }
 
 function randomSnip(prevId) {
@@ -101,7 +163,10 @@ function randomSnip(prevId) {
 // Display name for a saved test id (used by the profile page too).
 function snipName(id) {
   if (/^time\d+-/.test(id)) return id.replace(/^time(\d+)-/, '$1s ');
-  const all = [...ALGOS, ...Object.values(MISC).flat()];
+  if (id.startsWith('daily-')) return `daily ${id.slice(6)}`;
+  const b = /^build-(.+)-(\d+)$/.exec(id);
+  if (b) return `build ${b[1]} ${b[2]}`;
+  const all = [...ALGOS, ...Object.values(MISC).flat(), ...Object.values(GENERATORS).flat()];
   return all.find((s) => s.id === id)?.name || id;
 }
 
@@ -115,6 +180,10 @@ function makeSnip() {
       return { id: 'zen', name: 'zen', code: '' };
     case 'custom':
       return { id: 'custom', name: 'custom', code: cfg.custom || 'print("paste your own code with the custom button above")' };
+    case 'daily':
+      return dailySnip();
+    case 'build':
+      return buildSnip();
     case 'pick': {
       const all = algoSnips();
       return all.find((s) => s.id === cfg.algo) || all[0];
@@ -157,7 +226,8 @@ function newTest(sameSnippet) {
   const hint = cfg.mode === 'zen' ? ' · type anything, shift+enter to finish' : '';
   $('#algoName').textContent = `${snip.name}${pb ? ` · pb ${Math.round(pb.wpm)}` : ''}${hint}`;
   $('#langBtn').innerHTML = `${icon('globe')}<span></span>`;
-  $('#langBtn span').textContent = LANGS[cfg.lang];
+  $('#langBtn span').textContent = LANGS[lang()];
+  $('#langBtn').disabled = cfg.mode === 'build';
   $('#liveWpm').textContent = cfg.mode === 'time' ? cfg.time : '';
   code.scrollTop = 0;
   $('#result').hidden = true;
@@ -216,7 +286,8 @@ function finish() {
   $('#rRaw').textContent = Math.round(s.raw);
   $('#rChars').textContent = `${s.correct}/${s.incorrect}`;
   $('#rTime').textContent = `${s.seconds.toFixed(1)}s`;
-  $('#rAlgo').textContent = `${snip.name} · ${LANGS[cfg.lang]}`;
+  $('#rAlgo').textContent = `${snip.name} · ${LANGS[lang()]}`;
+  buildResult(s);
 
   const old = pbs[pbKey()];
   const isPb = !old || s.wpm > old.wpm;
@@ -233,6 +304,24 @@ function finish() {
   $('#result').hidden = false;
   drawGraph(history(test));
   if (typeof onRunFinished === 'function') onRunFinished(s); // account.js: save the run, leaderboard rank
+}
+
+// Build mode: finishing a part at 80%+ accuracy builds it; the game so far can then be played.
+function buildResult(s) {
+  const box = $('#buildDone');
+  box.hidden = cfg.mode !== 'build';
+  if (box.hidden) return;
+  const i = partIndex(), total = project().parts.length;
+  const passed = s.acc >= 80;
+  if (passed && i + 1 > doneParts()) {
+    built[cfg.project] = i + 1;
+    try { localStorage.setItem('penguintype-build', JSON.stringify(built)); } catch {}
+  }
+  buildPart = null; // next test: the first unfinished part
+  $('#buildMsg').textContent = !passed ? 'build parts need 80% accuracy, try again'
+    : i + 1 === total ? `${project().name} complete! the whole game is yours` : `part ${i + 1}/${total} built`;
+  $('#buildPlay').hidden = !doneParts();
+  buildBar();
 }
 
 // Inline SVG line chart: running wpm (accent), raw speed per second (muted), errors as red x marks.
@@ -342,6 +431,25 @@ function buildBar() {
     sel.value = cfg.algo;
     sel.onchange = () => { sel.blur(); setCfg('algo', sel.value); };
     sub.append(sel);
+  } else if (cfg.mode === 'daily') {
+    const d = document.createElement('span');
+    d.className = 'note';
+    d.textContent = `${today()} · same test for everyone`;
+    sub.append(d);
+  } else if (cfg.mode === 'build') {
+    const proj = document.createElement('select');
+    proj.setAttribute('aria-label', 'project');
+    for (const p of PROJECTS) proj.add(new Option(`${p.name} ${Math.min(built[p.id] || 0, p.parts.length)}/${p.parts.length}`, p.id));
+    proj.value = cfg.project;
+    proj.onchange = () => { proj.blur(); buildPart = null; setCfg('project', proj.value); };
+    const part = document.createElement('select');
+    part.setAttribute('aria-label', 'part');
+    // parts unlock in order: everything built so far plus the next one
+    project().parts.slice(0, doneParts() + 1).forEach((p, i) => part.add(new Option(`${i + 1}. ${p.name}`, i)));
+    part.value = partIndex();
+    part.onchange = () => { part.blur(); buildPart = Number(part.value); newTest(false); };
+    sub.append(proj, part);
+    if (doneParts()) sub.append(button('play', false, () => playGame(), 'play'));
   } else if (cfg.mode === 'custom') {
     sub.append(button('edit code', false, openCustom));
   }
@@ -372,13 +480,17 @@ function openLangs() {
 }
 
 // Popups close on Esc, a click outside the panel, or any [data-close] button.
+function closePopup(o) {
+  o.hidden = true;
+  if (o.id === 'playPop') $('#playFrame').srcdoc = ''; // stop the game
+}
 for (const o of document.querySelectorAll('.overlay')) {
-  o.addEventListener('click', (e) => { if (e.target === o || e.target.closest('[data-close]')) o.hidden = true; });
+  o.addEventListener('click', (e) => { if (e.target === o || e.target.closest('[data-close]')) closePopup(o); });
 }
 
 document.addEventListener('keydown', (e) => {
   const popup = document.querySelector('.overlay:not([hidden])');
-  if (popup) { if (e.key === 'Escape') popup.hidden = true; return; }
+  if (popup) { if (e.key === 'Escape') closePopup(popup); return; }
   if (e.key === 'Escape') { e.preventDefault(); return newTest(true); }
   // Tab focuses the next-test button, Enter (native button click) then switches, like Monkeytype.
   if (e.key === 'Tab') { e.preventDefault(); return $(test.end ? '#next' : '#skip').focus(); }
@@ -407,6 +519,8 @@ $('#next').onclick = () => newTest(false);
 $('#restart').innerHTML = icon('restart');
 $('#restart').onclick = (e) => { e.currentTarget.blur(); newTest(true); };
 $('#skip').innerHTML = icon('next');
+$('#buildPlay').innerHTML = `${icon('play')}<span>play your game</span>`;
+$('#buildPlay').onclick = (e) => { e.currentTarget.blur(); playGame(); };
 $('#skip').onclick = (e) => { e.currentTarget.blur(); newTest(false); };
 $('#langBtn').onclick = (e) => { e.currentTarget.blur(); openLangs(); };
 

@@ -43,6 +43,7 @@
       <div class="big"><div class="label">wpm</div><div id="rWpm"></div></div>
       <div class="big"><div class="label">acc</div><div id="rAcc"></div></div>
       <div id="rPb"></div>
+      <div id="buildDone" hidden><span id="buildMsg"></span><button id="buildPlay" class="pill"></button></div>
       <div id="lb" hidden><span id="lbMsg"></span><button id="lbSignIn" class="pill" hidden>sign in</button></div>
       <div class="chart">
         <svg id="graph" role="img" aria-label="speed over time"></svg>
@@ -82,7 +83,8 @@
 
   <div id="board" class="overlay" hidden>
     <div class="panel" role="dialog" aria-label="leaderboard">
-      <div class="panel-head"><h2>leaderboard <span>60s · all</span></h2><button class="close" data-close aria-label="close">✕</button></div>
+      <div class="panel-head"><h2>leaderboard <span id="boardSub"></span></h2><button class="close" data-close aria-label="close">✕</button></div>
+      <div class="group tabs" id="boardKinds"></div>
       <div class="group tabs" id="boardLangs"></div>
       <div class="table-wrap">
         <table>
@@ -90,6 +92,14 @@
           <tbody id="boardRows"></tbody>
         </table>
       </div>
+    </div>
+  </div>
+
+  <div id="playPop" class="overlay" hidden>
+    <div class="panel play" role="dialog" aria-label="play your game">
+      <div class="panel-head"><h2 id="playTitle"></h2><button class="close" data-close aria-label="close">✕</button></div>
+      <iframe id="playFrame" sandbox="allow-scripts" title="your game"></iframe>
+      <div class="hint">arrow keys or wasd · click the game if keys don't respond</div>
     </div>
   </div>
 
@@ -130,6 +140,8 @@
   <script src="engine.js"></script>
   <script src="snippets.js"></script>
   <script src="snippets-more.js"></script>
+  <script src="generators.js"></script>
+  <script src="projects.js"></script>
   <script src="app.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
   <script src="account.js"></script>
